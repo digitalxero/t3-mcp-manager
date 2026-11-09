@@ -83,7 +83,8 @@ pnpm run verify
 
 `Taskfile.yml` also exposes `verify`, and pinned `svu`/`chglog` release helpers.
 The small vendored T3 plugin SDK is MIT-licensed; see
-[`vendor/plugin-sdk/NOTICE`](vendor/plugin-sdk/NOTICE).
+[`vendor/plugin-sdk/NOTICE`](vendor/plugin-sdk/NOTICE) and
+[`THIRD_PARTY_LICENSES`](THIRD_PARTY_LICENSES).
 
 The focused suite covers scope precedence, worktrees, provider/instance switches,
 secret redaction, updates/removal, reload, serialized writes and failed atomic
