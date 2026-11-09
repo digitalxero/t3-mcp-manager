@@ -13,10 +13,12 @@ explicitly on those builds.
 
 ## Install and configure
 
-The repository includes a bundled `dist/plugin.mjs`; installation runs no package
-manager or build scripts. The host installs semver tags from a repository URL.
-Until the first version is published, use the host's local plugin development
-configuration with this checkout's `dist/plugin.mjs`.
+In **Settings → Plugins**, install `https://github.com/digitalxero/t3-mcp-manager`.
+The host selects the newest stable version tag, checks for updates daily or on
+request, and lets you apply an update or remove the plugin there. The repository
+includes a bundled `dist/plugin.mjs`; installation runs no package manager or build
+scripts. For local development, register this checkout's `dist/plugin.mjs` using
+the host's local plugin configuration.
 
 Open **Settings → Plugins → MCP Manager** on the environment that runs your
 providers. Add a name, choose all projects or an absolute project directory, then

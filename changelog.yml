@@ -1,0 +1,38 @@
+- semver: 0.1.0
+  date: 2026-11-09T15:45:55.861364528-08:00
+  packager: DigitalXero
+  changes:
+    - commit: aaaaf7e32f4cdade5a724f05f37576fa3b3341f6
+      note: "ci: verify the plugin on Linux macOS and Windows"
+      author:
+        name: Dj Gilcrease
+        email: digitalxero@gmail.com
+      committer:
+        name: Dj Gilcrease
+        email: digitalxero@gmail.com
+      conventional_commit:
+        category: ci
+        scope: ""
+        description: verify the plugin on Linux macOS and Windows
+        body: ""
+        footer: []
+        major: false
+        minor: false
+        patch: false
+    - commit: a41db42a1ee84b1dc4c52b7c134aeb555155b569
+      note: "feat: manage MCP servers by project and provider"
+      author:
+        name: Dj Gilcrease
+        email: digitalxero@gmail.com
+      committer:
+        name: Dj Gilcrease
+        email: digitalxero@gmail.com
+      conventional_commit:
+        category: feat
+        scope: ""
+        description: manage MCP servers by project and provider
+        body: ""
+        footer: []
+        major: false
+        minor: true
+        patch: false
