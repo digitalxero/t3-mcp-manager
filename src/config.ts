@@ -24,16 +24,17 @@ export interface Server {
   args: string[];
   url: string;
   secretKey: string;
+  auth: "static" | "oauth";
 }
 export interface State {
-  version: 1;
+  version: 2;
   servers: Server[];
 }
 export interface Credentials {
   environment: Record<string, string>;
   headers: Record<string, string>;
 }
-export const initialState = (): State => ({ version: 1, servers: [] });
+export const initialState = (): State => ({ version: 2, servers: [] });
 export function text(value: unknown, name: string, max = 16384): string {
   if (typeof value !== "string" || value.length > max || value.includes("\0"))
     throw Error(`Invalid ${name}`);
@@ -87,6 +88,9 @@ export function parseServer(input: Record<string, unknown>, id: string, previous
   const transport = input.transport;
   if (transport !== "stdio" && transport !== "http" && transport !== "sse")
     throw Error("Invalid transport");
+  const auth = input.auth ?? previous?.auth ?? "static";
+  if (auth !== "static" && auth !== "oauth") throw Error("Invalid authentication mode");
+  if (auth === "oauth" && transport !== "http") throw Error("OAuth requires Streamable HTTP");
   const command = text(input.command ?? "", "command");
   let args: unknown;
   try {
@@ -132,16 +136,22 @@ export function parseServer(input: Record<string, unknown>, id: string, previous
     args: args as string[],
     url,
     secretKey: previous?.secretKey ?? `server-${id}`,
+    auth,
   };
 }
 export function decodeState(value: unknown): State {
   const input = record(value);
-  if (input.version !== 1 || !Array.isArray(input.servers) || input.servers.length > 40)
+  if (
+    (input.version !== 1 && input.version !== 2) ||
+    !Array.isArray(input.servers) ||
+    input.servers.length > 40
+  )
     throw Error("Invalid MCP manager state");
   const servers = input.servers.map((value) => {
     const row = record(value);
     const id = text(row.id, "id", 80);
-    if (!/^[a-f0-9-]{36}$/.test(id)) throw Error("Invalid server id");
+    if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/.test(id))
+      throw Error("Invalid server id");
     const server = parseServer({ ...row, scope: row.project === null ? "global" : "project" }, id);
     if (
       typeof row.enabled !== "boolean" ||
@@ -163,7 +173,7 @@ export function decodeState(value: unknown): State {
     new Set(servers.map((s) => JSON.stringify([s.project, s.name]))).size !== servers.length
   )
     throw Error("Duplicate MCP server");
-  return { version: 1, servers };
+  return { version: 2, servers };
 }
 export function selectedServers(
   state: State,

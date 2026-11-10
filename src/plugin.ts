@@ -9,9 +9,13 @@ import {
   type T3Plugin,
 } from "@t3tools/plugin-sdk";
 import * as Effect from "effect/Effect";
+import * as PubSub from "effect/PubSub";
+import * as Stream from "effect/Stream";
+import { createOAuth } from "./oauth.ts";
+import { oauthBlocks } from "./oauthView.ts";
 import { PROVIDERS, type Server } from "./config.ts";
 import { createStore, type Store } from "./store.ts";
-const VERSION = "0.1.0";
+const VERSION = "0.2.0";
 const call = <A>(operation: string, run: () => Promise<A>) =>
   Effect.tryPromise({ try: run, catch: (cause) => new PluginError({ operation, cause }) });
 const action = (id: string, label: string, command: string, input: PluginInput): PluginAction => ({
@@ -28,6 +32,7 @@ const publicServer = (server: Server) => ({
   enabled: server.enabled,
   providers: server.providers,
   transport: server.transport,
+  auth: server.auth,
 });
 function settings(state: Awaited<ReturnType<Store["list"]>>): PluginView {
   const fields: (typeof PluginField.Type)[] = [
@@ -73,6 +78,16 @@ function settings(state: Awaited<ReturnType<Store["list"]>>): PluginView {
       label: "Secret HTTP headers as JSON (blank keeps existing)",
       kind: "password",
     },
+    {
+      name: "auth",
+      label: "Authentication",
+      kind: "select",
+      value: "static",
+      options: [
+        { label: "Environment variables or HTTP headers", value: "static" },
+        { label: "OAuth (Streamable HTTP)", value: "oauth" },
+      ],
+    },
     ...PROVIDERS.map(([id, label]) => ({
       name: `provider-${id.toLowerCase()}`,
       label: `Enable for ${label}`,
@@ -101,13 +116,14 @@ function settings(state: Awaited<ReturnType<Store["list"]>>): PluginView {
       {
         id: "servers",
         kind: "table",
-        columns: ["Name", "Scope", "Transport", "State", "Enabled providers"],
+        columns: ["Name", "Scope", "Transport", "Authentication", "State", "Enabled providers"],
         rows: state.servers.map((server) => ({
           id: server.id,
           cells: [
             server.label,
             server.project ?? "All projects",
             server.transport,
+            server.auth === "oauth" ? "OAuth" : "Static credentials",
             server.enabled ? "Enabled" : "Disabled",
             PROVIDERS.filter(([id]) => server.providers[id] !== false)
               .map(([, label]) => label)
@@ -126,7 +142,7 @@ function settings(state: Awaited<ReturnType<Store["list"]>>): PluginView {
                 { id: server.id, provider: id, enabled: server.providers[id] === false },
               ),
             ),
-            action("clear-credentials", "Clear credentials", "clear-credentials", {
+            action("clear-credentials", "Clear static credentials", "clear-credentials", {
               id: server.id,
             }),
             action("remove", "Remove", "remove", { id: server.id }),
@@ -166,9 +182,16 @@ function settings(state: Awaited<ReturnType<Store["list"]>>): PluginView {
   };
 }
 export async function activateManager(context: PluginContext) {
-  if (!context.capabilities?.includes("provider-mcp-servers"))
+  if (
+    !context.capabilities?.includes("provider-mcp-servers") ||
+    !context.capabilities?.includes("http-response-timeout")
+  )
     throw Error("This host does not support provider MCP configuration");
   const store = await createStore(context);
+  const changes = await Effect.runPromise(PubSub.unbounded<void>());
+  const oauth = await createOAuth(context, store, {
+    changed: () => Effect.runPromise(PubSub.publish(changes, undefined)).then(() => undefined),
+  });
   const descriptor = (
     id: string,
     title: string,
@@ -192,10 +215,16 @@ export async function activateManager(context: PluginContext) {
         true,
       ),
       descriptor("save", "Save an MCP server definition and write-only credentials", (input) =>
-        store.save(input),
+        store.save(input).then(async (result) => {
+          await oauth.policyChanged(result.id);
+          return result;
+        }),
       ),
       descriptor("set-enabled", "Enable or disable an MCP server", (input) =>
-        store.setEnabled(input.id, input.enabled),
+        store.setEnabled(input.id, input.enabled).then(async (result) => {
+          await oauth.policyChanged(result.id);
+          return result;
+        }),
       ),
       descriptor(
         "set-provider",
@@ -203,10 +232,30 @@ export async function activateManager(context: PluginContext) {
         (input) => store.setProvider(input.id, input.provider, input.enabled),
       ),
       descriptor("clear-credentials", "Clear credentials for an MCP server", (input) =>
-        store.clearCredentials(input.id),
+        store.clearCredentials(input.id).then(async (result) => {
+          await oauth.policyChanged(String(input.id));
+          return result;
+        }),
       ),
       descriptor("remove", "Remove an MCP server definition and its credentials", (input) =>
-        store.remove(input.id),
+        store.remove(input.id).then(async (result) => {
+          await oauth.policyChanged(String(input.id));
+          return result;
+        }),
+      ),
+      descriptor(
+        "oauth-start",
+        "Connect an independent OAuth account for a server and project",
+        (input) => oauth.start(input),
+      ),
+      descriptor("oauth-complete", "Complete this project's OAuth sign-in", (input) =>
+        oauth.finish(input),
+      ),
+      descriptor("oauth-cancel", "Cancel this project's pending OAuth sign-in", (input) =>
+        oauth.cancel(String(input.id)),
+      ),
+      descriptor("oauth-disconnect", "Disconnect only this project's OAuth account", (input) =>
+        oauth.disconnect(String(input.id)),
       ),
     ],
     views: [
@@ -215,10 +264,29 @@ export async function activateManager(context: PluginContext) {
         title: "MCP Manager",
         location: "settings" as const,
         permission: "providers:manage" as const,
-        read: () => call("settings", async () => settings(await store.list())),
+        read: () =>
+          call("settings", async () => {
+            const view = settings(await store.list());
+            const base = await Effect.runPromise(context.httpBaseUrl);
+            return {
+              ...view,
+              blocks: [
+                ...view.blocks,
+                ...oauthBlocks(await oauth.status(), base.replace(/\/$/, "") + "/oauth/callback"),
+              ],
+            };
+          }),
       },
     ],
-    mcpServers: (context: PluginMcpContext) => call("prepare-mcp", () => store.resolve(context)),
+    mcpServers: (context: PluginMcpContext) =>
+      call("prepare-mcp", () => store.resolve(context, oauth.resolve)),
+    httpResponseTimeoutMs: 3_900_000,
+    handleHttp: (request: Request) => call("http", () => oauth.handleHttp(request)),
+    changes: Stream.fromPubSub(changes),
+    async [Symbol.asyncDispose]() {
+      await oauth.close();
+      await Effect.runPromise(PubSub.shutdown(changes));
+    },
   };
 }
 export default {
@@ -228,5 +296,14 @@ export default {
   version: VERSION,
   description:
     "Manage MCP servers across projects and provider instances without editing provider configuration files.",
-  activate: (context) => call("activate", () => activateManager(context)),
+  activate: (context) =>
+    call("activate", () => activateManager(context)).pipe(
+      Effect.tap((contributions) =>
+        Effect.addFinalizer(() =>
+          call("shutdown", () => contributions[Symbol.asyncDispose]()).pipe(
+            Effect.catch(() => Effect.void),
+          ),
+        ),
+      ),
+    ),
 } satisfies T3Plugin;

@@ -4,6 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
+import * as Scope from "effect/Scope";
+import * as Exit from "effect/Exit";
 import { PluginView, PluginMcpServers } from "@t3tools/plugin-sdk";
 import plugin from "../dist/plugin.mjs";
 
@@ -14,26 +16,29 @@ assert.equal(plugin.version, pkg.version);
 assert.equal(plugin.id, manifest.id);
 const directory = await mkdtemp(join(tmpdir(), "t3-mcp-artifact-"));
 const secrets = new Map();
+const scope = await Effect.runPromise(Scope.make());
 try {
   const contribution = await Effect.runPromise(
-    plugin.activate({
-      id: plugin.id,
-      dataDirectory: directory,
-      capabilities: ["provider-mcp-servers"],
-      httpBasePath: "/api/plugins/mcp-manager",
-      httpBaseUrl: Effect.succeed("http://localhost/api/plugins/mcp-manager"),
-      secrets: {
-        get: (key) => Effect.sync(() => secrets.get(key) ?? null),
-        set: (key, value) =>
-          Effect.sync(() => {
-            secrets.set(key, value);
-          }),
-        remove: (key) =>
-          Effect.sync(() => {
-            secrets.delete(key);
-          }),
-      },
-    }),
+    plugin
+      .activate({
+        id: plugin.id,
+        dataDirectory: directory,
+        capabilities: ["provider-mcp-servers", "http-response-timeout"],
+        httpBasePath: "/api/plugins/mcp-manager",
+        httpBaseUrl: Effect.succeed("http://localhost/api/plugins/mcp-manager"),
+        secrets: {
+          get: (key) => Effect.sync(() => secrets.get(key) ?? null),
+          set: (key, value) =>
+            Effect.sync(() => {
+              secrets.set(key, value);
+            }),
+          remove: (key) =>
+            Effect.sync(() => {
+              secrets.delete(key);
+            }),
+        },
+      })
+      .pipe(Effect.provideService(Scope.Scope, scope)),
   );
   Schema.decodeUnknownSync(PluginView)(await Effect.runPromise(contribution.views[0].read()));
   const save = contribution.commands.find((command) => command.id === "save");
@@ -51,7 +56,18 @@ try {
   );
   Schema.decodeUnknownSync(PluginMcpServers)(servers);
   assert.equal(servers["mcp-manager-fixture"].command, "fixture-server");
+  await Effect.runPromise(
+    save.run({
+      name: "oauth-fixture",
+      scope: "global",
+      transport: "http",
+      url: "https://mcp.example.invalid/api",
+      auth: "oauth",
+    }),
+  );
+  Schema.decodeUnknownSync(PluginView)(await Effect.runPromise(contribution.views[0].read()));
   console.log("Bundled artifact: activation, settings schema, command and MCP contribution passed");
 } finally {
+  await Effect.runPromise(Scope.close(scope, Exit.void));
   await rm(directory, { recursive: true, force: true });
 }

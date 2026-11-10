@@ -82,9 +82,15 @@ export async function createStore(context: PluginContext) {
     return server;
   };
   const update = (server: Server) =>
-    persist({ version: 1, servers: state.servers.map((s) => (s.id === server.id ? server : s)) });
+    persist({ version: 2, servers: state.servers.map((s) => (s.id === server.id ? server : s)) });
   return {
     list: () => serial(async () => structuredClone(state)),
+    get: (id: string) =>
+      serial(async () => {
+        const server = state.servers.find((server) => server.id === id);
+        return server ? structuredClone(server) : undefined;
+      }),
+    credentials: (server: Server) => serial(() => credentials(server)),
     save: (input: Record<string, unknown>) =>
       serial(async () => {
         const project =
@@ -115,7 +121,7 @@ export async function createStore(context: PluginContext) {
         await Effect.runPromise(context.secrets.set(server.secretKey, JSON.stringify(after)));
         try {
           await persist({
-            version: 1,
+            version: 2,
             servers: previous
               ? state.servers.map((s) => (s.id === previous.id ? server : s))
               : [...state.servers, server],
@@ -124,7 +130,11 @@ export async function createStore(context: PluginContext) {
           await cleanup(server.secretKey);
           throw error;
         }
-        if (previous) await cleanup(previous.secretKey);
+        if (previous) {
+          await cleanup(previous.secretKey);
+          if (previous.url !== server.url || previous.auth !== server.auth)
+            await cleanup(`oauth-${server.id.replaceAll("-", "")}`);
+        }
         return { id: server.id, saved: true };
       }),
     setEnabled: (id: unknown, enabled: unknown) =>
@@ -146,8 +156,9 @@ export async function createStore(context: PluginContext) {
     remove: (id: unknown) =>
       serial(async () => {
         const server = find(id);
-        await persist({ version: 1, servers: state.servers.filter((s) => s.id !== id) });
+        await persist({ version: 2, servers: state.servers.filter((s) => s.id !== id) });
         await cleanup(server.secretKey);
+        await cleanup(`oauth-${server.id.replaceAll("-", "")}`);
         return { removed: true };
       }),
     clearCredentials: (id: unknown) =>
@@ -166,7 +177,7 @@ export async function createStore(context: PluginContext) {
         await cleanup(server.secretKey);
         return { cleared: true };
       }),
-    resolve: (launch: PluginMcpContext) =>
+    resolve: (launch: PluginMcpContext, oauth?: (server: Server) => Promise<PluginMcpServer>) =>
       serial(async (): Promise<PluginMcpServers> => {
         let project = launch.projectDirectory
           ? await Fs.realpath(launch.projectDirectory)
@@ -192,7 +203,14 @@ export async function createStore(context: PluginContext) {
         }
         const result: Record<string, PluginMcpServer> = {};
         for (const server of selectedServers(state, launch, project))
-          result[`mcp-manager-${server.name}`] = serverConfig(server, await credentials(server));
+          result[`mcp-manager-${server.name}`] =
+            server.auth === "oauth"
+              ? oauth
+                ? await oauth(server)
+                : (() => {
+                    throw Error("OAuth connection is not configured");
+                  })()
+              : serverConfig(server, await credentials(server));
         return result;
       }),
   };
