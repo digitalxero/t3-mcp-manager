@@ -93,7 +93,7 @@ export const PluginView = Schema.Struct({
 export const PluginViewDescriptor = Schema.Struct({
     id: PluginLocalId,
     title: Label,
-    location: Schema.Literals(["settings", "usage"]),
+    location: Schema.Literals(["settings", "settings-page", "usage"]),
     permission: PluginPermission,
 });
 export const PluginCommandDescriptor = Schema.Struct({
@@ -138,4 +138,29 @@ export const PluginMcpContext = Schema.Struct({
     projectDirectory: Schema.optionalKey(Text),
     cwd: Schema.optionalKey(Text),
 });
+export const PluginProcessInput = Schema.Struct({
+    command: Text,
+    args: Schema.Array(Text).check(Schema.isMaxLength(100)),
+    cwd: Text,
+    environment: Schema.Record(Label, Text),
+    timeoutMs: Schema.Int.check(Schema.isBetween({ minimum: 1_000, maximum: 1_500_000 })),
+});
+export const PluginProcessResult = Schema.Struct({
+    code: Schema.NullOr(Schema.Int),
+    timedOut: Schema.Boolean,
+    stdout: Text,
+    stderr: Text,
+    stdoutTruncated: Schema.Boolean,
+    stderrTruncated: Schema.Boolean,
+});
 export const PluginHttpResponseTimeout = Schema.Int.check(Schema.isBetween({ minimum: 1_000, maximum: 3_900_000 }));
+export const PluginLifecycleEvent = Schema.Struct({
+    type: Schema.Literals(["worktree.created", "worktree.removing", "worktree.removed"]),
+    repositoryDirectory: Text,
+    worktreePath: Text,
+    refName: Schema.optionalKey(Text),
+});
+export const PluginLifecycleResult = Schema.NullOr(Schema.Struct({ error: Text }));
+export class PluginLifecycleBlocked extends Schema.TaggedError()("PluginLifecycleBlocked", { pluginId: PluginId, message: Text }) {
+}
+export const PluginLifecycleTimeout = Schema.Int.check(Schema.isBetween({ minimum: 1_000, maximum: 1_800_000 }));
