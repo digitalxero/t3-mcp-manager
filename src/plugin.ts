@@ -15,7 +15,7 @@ import { createOAuth } from "./oauth.ts";
 import { oauthBlocks } from "./oauthView.ts";
 import { PROVIDERS, type Server } from "./config.ts";
 import { createStore, type Store } from "./store.ts";
-const VERSION = "0.2.0";
+const VERSION = "0.3.0";
 const call = <A>(operation: string, run: () => Promise<A>) =>
   Effect.tryPromise({ try: run, catch: (cause) => new PluginError({ operation, cause }) });
 const action = (id: string, label: string, command: string, input: PluginInput): PluginAction => ({

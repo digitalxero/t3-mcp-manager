@@ -9108,6 +9108,25 @@ const Declaration = class extends ASTNodeImpl {
 	}
 };
 /**
+* Constructs a {@link Null}.
+*
+* @stability stable
+* @category constructors
+* @since 4.0.0
+*/
+const Null$1 = class extends ASTNodeImpl {
+	_tag = "Null";
+	/** @internal */
+	getParser() {
+		return fromConst(this, null);
+	}
+	/** @internal */
+	getExpected() {
+		return "null";
+	}
+};
+const null_ = /*#__PURE__*/ new Null$1();
+/**
 * Constructs a {@link Unknown}.
 *
 * @stability stable
@@ -11317,6 +11336,15 @@ function Literal(literal) {
 */
 const Unknown = /*#__PURE__*/ make$3(unknown$1);
 /**
+* Schema for the `null` literal. Validates that the input is strictly `null`.
+*
+* @see {@link NullOr} for a union with another schema.
+* @stability stable
+* @category schemas
+* @since 3.10.0
+*/
+const Null = /*#__PURE__*/ make$3(null_);
+/**
 * Schema for `string` values. Validates that the input is `typeof` `"string"`.
 *
 * @stability stable
@@ -11528,6 +11556,14 @@ function Literals(literals) {
 		}
 	});
 }
+/**
+* Creates a union schema of `S | null`.
+*
+* @stability stable
+* @category constructors
+* @since 3.10.0
+*/
+const NullOr = /*#__PURE__*/ lambda((self) => Union([self, Null]));
 function decodeTo(to, transformation) {
 	return (from) => {
 		return make$3(decodeTo$1(from.ast, to.ast, transformation ? makeTransformation(transformation) : passthrough()), {
@@ -12281,7 +12317,11 @@ Struct({
 Struct({
 	id: PluginLocalId,
 	title: Label,
-	location: Literals(["settings", "usage"]),
+	location: Literals([
+		"settings",
+		"settings-page",
+		"usage"
+	]),
 	permission: PluginPermission
 });
 Struct({
@@ -12321,9 +12361,46 @@ Struct({
 	projectDirectory: optionalKey(Text),
 	cwd: optionalKey(Text)
 });
+Struct({
+	command: Text,
+	args: ArraySchema(Text).check(isMaxLength(100)),
+	cwd: Text,
+	environment: Record(Label, Text),
+	timeoutMs: Int.check(isBetween({
+		minimum: 1e3,
+		maximum: 15e5
+	}))
+});
+Struct({
+	code: NullOr(Int),
+	timedOut: Boolean$1,
+	stdout: Text,
+	stderr: Text,
+	stdoutTruncated: Boolean$1,
+	stderrTruncated: Boolean$1
+});
 Int.check(isBetween({
 	minimum: 1e3,
 	maximum: 39e5
+}));
+Struct({
+	type: Literals([
+		"worktree.created",
+		"worktree.removing",
+		"worktree.removed"
+	]),
+	repositoryDirectory: Text,
+	worktreePath: Text,
+	refName: optionalKey(Text)
+});
+NullOr(Struct({ error: Text }));
+TaggedError()("PluginLifecycleBlocked", {
+	pluginId: PluginId,
+	message: Text
+});
+Int.check(isBetween({
+	minimum: 1e3,
+	maximum: 18e5
 }));
 // node_modules/.pnpm/effect@4.1.2/node_modules/effect/dist/Latch.js
 /**
@@ -23661,7 +23738,7 @@ async function createStore(context) {
 	};
 }
 // src/plugin.ts
-const VERSION = "0.2.0";
+const VERSION = "0.3.0";
 const call = (operation, run) => tryPromise({
 	try: run,
 	catch: (cause) => new PluginError({

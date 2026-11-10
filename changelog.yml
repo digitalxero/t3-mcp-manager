@@ -1,3 +1,24 @@
+- semver: 0.3.0
+  date: 2026-11-09T20:21:55.47156188-08:00
+  packager: DigitalXero
+  changes:
+    - commit: 2bada6393b94aa1b91133fffcc54d69136e18557
+      note: 'feat: move MCP management into its own settings page'
+      author:
+        name: Dj Gilcrease
+        email: digitalxero@gmail.com
+      committer:
+        name: Dj Gilcrease
+        email: digitalxero@gmail.com
+      conventional_commit:
+        category: feat
+        scope: ""
+        description: move MCP management into its own settings page
+        body: ""
+        footer: []
+        major: false
+        minor: true
+        patch: false
 - semver: 0.2.0
   date: 2026-11-09T16:53:10.645442358-08:00
   packager: DigitalXero

@@ -1,4 +1,10 @@
 
+0.3.0
+=============
+2026-11-10
+
+* feat: move MCP management into its own settings page (2bada639)
+
 0.2.0
 =============
 2026-11-10
