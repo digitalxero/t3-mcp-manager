@@ -138,3 +138,4 @@ export const PluginMcpContext = Schema.Struct({
     projectDirectory: Schema.optionalKey(Text),
     cwd: Schema.optionalKey(Text),
 });
+export const PluginHttpResponseTimeout = Schema.Int.check(Schema.isBetween({ minimum: 1_000, maximum: 3_900_000 }));

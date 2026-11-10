@@ -16,7 +16,7 @@ async function fixture() {
   const context: PluginContext = {
     id: "mcp-manager",
     dataDirectory: Path.join(root, "data"),
-    capabilities: ["provider-mcp-servers"],
+    capabilities: ["provider-mcp-servers", "http-response-timeout"],
     httpBasePath: "/api/plugins/mcp-manager",
     httpBaseUrl: Effect.succeed("http://localhost/api/plugins/mcp-manager"),
     secrets: {
@@ -134,7 +134,7 @@ test("linked worktrees use their owning project while another repository stays s
 
 test("credentials are write-only; update, clearing and removal do not expose them", async () => {
   await using f = await fixture();
-  const plugin = await activateManager(f.context);
+  await using plugin = await activateManager(f.context);
   const run = (id: string, input: PluginInput) =>
     Effect.runPromise(plugin.commands.find((c) => c.id === id)!.run(input));
   const saved = (await run(
@@ -222,7 +222,24 @@ test("corrupt state, missing credentials and incompatible hosts fail closed", as
   await assert.rejects(store.resolve(session()), /credential entry is missing/);
   await Fs.writeFile(
     Path.join(f.context.dataDirectory, "servers.json"),
-    '{"version":2,"servers":[]}',
+    '{"version":99,"servers":[]}',
   );
   await assert.rejects(createStore(f.context), /Invalid MCP manager state/);
+});
+
+test("upgrades v0.1 settings without changing their scoped policies or credentials", async () => {
+  await using f = await fixture();
+  const store = await createStore(f.context);
+  const saved = await store.save(definition({ environment: '{"TOKEN":"legacy-secret"}' }));
+  const path = Path.join(f.context.dataDirectory, "servers.json");
+  const before = JSON.parse(await Fs.readFile(path, "utf8"));
+  before.version = 1;
+  for (const server of before.servers) delete server.auth;
+  await Fs.writeFile(path, JSON.stringify(before));
+  const upgraded = await createStore(f.context);
+  assert.equal((await upgraded.list()).servers[0]!.auth, "static");
+  assert.match(JSON.stringify(await upgraded.resolve(session())), /legacy-secret/);
+  await upgraded.setEnabled(saved.id, false);
+  assert.equal(JSON.parse(await Fs.readFile(path, "utf8")).version, 2);
+  assert.equal(f.secrets.size, 1);
 });
