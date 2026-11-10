@@ -184,9 +184,12 @@ function settings(state: Awaited<ReturnType<Store["list"]>>): PluginView {
 export async function activateManager(context: PluginContext) {
   if (
     !context.capabilities?.includes("provider-mcp-servers") ||
-    !context.capabilities?.includes("http-response-timeout")
+    !context.capabilities?.includes("http-response-timeout") ||
+    !context.capabilities?.includes("settings-pages")
   )
-    throw Error("This host does not support provider MCP configuration");
+    throw Error(
+      "This plugin requires the PoC host with provider MCP configuration and standalone settings pages",
+    );
   const store = await createStore(context);
   const changes = await Effect.runPromise(PubSub.unbounded<void>());
   const oauth = await createOAuth(context, store, {
@@ -262,7 +265,7 @@ export async function activateManager(context: PluginContext) {
       {
         id: "settings",
         title: "MCP Manager",
-        location: "settings" as const,
+        location: "settings-page" as const,
         permission: "providers:manage" as const,
         read: () =>
           call("settings", async () => {

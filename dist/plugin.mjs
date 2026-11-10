@@ -23879,7 +23879,7 @@ function settings(state) {
 	};
 }
 async function activateManager(context) {
-	if (!context.capabilities?.includes("provider-mcp-servers") || !context.capabilities?.includes("http-response-timeout")) throw Error("This host does not support provider MCP configuration");
+	if (!context.capabilities?.includes("provider-mcp-servers") || !context.capabilities?.includes("http-response-timeout") || !context.capabilities?.includes("settings-pages")) throw Error("This plugin requires the PoC host with provider MCP configuration and standalone settings pages");
 	const store = await createStore(context);
 	const changes = await runPromise(unbounded());
 	const oauth = await createOAuth(context, store, { changed: () => runPromise(publish(changes, void 0)).then(() => void 0) });
@@ -23919,7 +23919,7 @@ async function activateManager(context) {
 		views: [{
 			id: "settings",
 			title: "MCP Manager",
-			location: "settings",
+			location: "settings-page",
 			permission: "providers:manage",
 			read: () => call("settings", async () => {
 				const view = settings(await store.list());

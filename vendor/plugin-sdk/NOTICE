@@ -1,5 +1,4 @@
 T3 Code plugin SDK, MIT license, Copyright (c) 2026 T3 Tools Inc.
-Source: https://github.com/djgilcrease/t3code/tree/ed2729651b0973b6411b68b64a1a331be46fb139/packages/plugin-sdk
-Includes provider-mcp-servers and http-response-timeout capabilities from the
-maintained t3/create-plugin-system host branch.
+Source: https://github.com/djgilcrease/t3code/tree/990e429edb3a4de06204c2535f3086e58516e329/packages/plugin-sdk
+Includes provider MCP configuration, HTTP deadlines, and standalone settings pages.
 The original license is preserved in LICENSE in this directory.

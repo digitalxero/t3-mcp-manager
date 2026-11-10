@@ -23,7 +23,7 @@ try {
       .activate({
         id: plugin.id,
         dataDirectory: directory,
-        capabilities: ["provider-mcp-servers", "http-response-timeout"],
+        capabilities: ["provider-mcp-servers", "http-response-timeout", "settings-pages"],
         httpBasePath: "/api/plugins/mcp-manager",
         httpBaseUrl: Effect.succeed("http://localhost/api/plugins/mcp-manager"),
         secrets: {

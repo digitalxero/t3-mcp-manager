@@ -16,7 +16,7 @@ async function fixture() {
   const context: PluginContext = {
     id: "mcp-manager",
     dataDirectory: Path.join(root, "data"),
-    capabilities: ["provider-mcp-servers", "http-response-timeout"],
+    capabilities: ["provider-mcp-servers", "http-response-timeout", "settings-pages"],
     httpBasePath: "/api/plugins/mcp-manager",
     httpBaseUrl: Effect.succeed("http://localhost/api/plugins/mcp-manager"),
     secrets: {
@@ -242,4 +242,17 @@ test("upgrades v0.1 settings without changing their scoped policies or credentia
   await upgraded.setEnabled(saved.id, false);
   assert.equal(JSON.parse(await Fs.readFile(path, "utf8")).version, 2);
   assert.equal(f.secrets.size, 1);
+});
+
+test("requires standalone settings pages and contributes no inline plugin view", async () => {
+  await using f = await fixture();
+  await assert.rejects(
+    activateManager({
+      ...f.context,
+      capabilities: ["provider-mcp-servers", "http-response-timeout"],
+    }),
+  );
+  await using plugin = await activateManager(f.context);
+  assert.equal(plugin.views[0]?.location, "settings-page");
+  Schema.decodeUnknownSync(PluginView)(await Effect.runPromise(plugin.views[0]!.read()));
 });

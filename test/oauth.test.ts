@@ -156,7 +156,7 @@ async function fixture() {
   const context: PluginContext = {
     id: "mcp-manager",
     dataDirectory: Path.join(root, "data"),
-    capabilities: ["provider-mcp-servers", "http-response-timeout"],
+    capabilities: ["provider-mcp-servers", "http-response-timeout", "settings-pages"],
     httpBasePath: "/api/plugins/mcp-manager",
     httpBaseUrl: Effect.succeed(`${origin}/api/plugins/mcp-manager`),
     secrets: {

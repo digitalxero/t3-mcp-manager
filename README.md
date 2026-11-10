@@ -20,7 +20,7 @@ includes a bundled `dist/plugin.mjs`; installation runs no package manager or bu
 scripts. For local development, register this checkout's `dist/plugin.mjs` using
 the host's local plugin configuration.
 
-Open **Settings → Plugins → MCP Manager** on the environment that runs your
+Open **Settings → Extensions → MCP Manager** on the environment that runs your
 providers. Add a name, choose all projects or an absolute project directory, then
 choose a local command (stdio), Streamable HTTP endpoint, or legacy SSE endpoint.
 Arguments are a JSON array, for example `["--read-only"]`. A local command and its
